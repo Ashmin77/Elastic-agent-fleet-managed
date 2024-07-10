@@ -1,0 +1,187 @@
+# tasks/install.yml : Install Elastic Agent
+---
+- name: Check if Elastic Agent service is running
+  command: systemctl is-active --quiet elastic-agent
+  register: elastic_agent_service_status
+  failed_when: false
+  changed_when: false
+
+- name: Check if Elastic Agent is installed
+  stat:
+    path: "{{ elastic_agent_install_dir }}/elastic-agent"
+  register: elastic_agent_installed
+
+- name: Agent already installed, skipping the installation
+  debug:
+    msg: "Elastic Agent is already installed and running. Skipping installation."
+  when: elastic_agent_service_status.rc == 0
+
+- name: Display Elastic Agent service status
+  command: systemctl status elastic-agent
+  register: elastic_agent_status
+  when: elastic_agent_service_status.rc == 0
+
+- name: Display Elastic Agent service status
+  debug:
+    msg: "{{ elastic_agent_status.stdout }}"
+  when: elastic_agent_service_status.rc == 0
+
+- name: Display Elastic Agent enrollment status
+  shell: /opt/elastic-agent-{{ elastic_agent_version }}-linux-x86_64/elastic-agent status
+  register: elastic_agent_enrollment_status
+  when: elastic_agent_service_status.rc == 0
+
+- name: Display Elastic Agent enrollment status
+  debug:
+    msg: "Elastic Agent enrollment status: {{ elastic_agent_enrollment_status.stdout }}"
+  when: elastic_agent_service_status.rc == 0
+
+- name: Set fact for new installation
+  set_fact:
+    elastic_agent_new_install: true
+  when: elastic_agent_service_status.rc != 0
+
+- name: Skip remaining tasks if agent is installed and running
+  meta: end_play
+  when: elastic_agent_service_status.rc == 0
+
+# Proceed with installation if the agent is not running
+- name: Ensure expect package is installed (Ubuntu)
+  apt:
+    name: expect
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Ensure expect package is installed (RedHat)
+  yum:
+    name: expect
+    state: present
+  when: ansible_os_family == "RedHat"
+
+# Add debug task to print the URL
+- name: Debug Elastic Agent download URL
+  debug:
+    msg: "Elastic Agent download URL: {{ elastic_agent_url }}"
+
+- name: Download Elastic Agent
+  get_url:
+    url: "{{ elastic_agent_url }}"
+    dest: "/tmp/elastic-agent.tar.gz"
+
+# Add debug task to confirm file download
+- name: Debug downloaded file existence
+  stat:
+    path: "/tmp/elastic-agent.tar.gz"
+  register: download_file_stat
+
+- name: Check if Elastic Agent tar.gz was downloaded
+  debug:
+    msg: "Downloaded file exists: {{ download_file_stat.stat.exists }}"
+
+- name: Extract Elastic Agent
+  unarchive:
+    src: "/tmp/elastic-agent.tar.gz"
+    dest: "/opt/"
+    remote_src: yes
+
+- name: Install Elastic Agent
+  shell: |
+    expect -c '
+    spawn /opt/elastic-agent-{{ elastic_agent_version }}-linux-x86_64/elastic-agent install
+    expect "Do you want to continue? \\[Y/n\\]:"
+    send "Y\r"
+    expect eof
+    '
+  args:
+    creates: "{{ elastic_agent_install_dir }}/elastic-agent"
+
+- name: Remove existing Elastic Agent file
+  file:
+    path: /usr/bin/elastic-agent
+    state: absent
+
+- name: Create symlink to Elastic Agent
+  file:
+    src: "/opt/elastic-agent-{{ elastic_agent_version }}-linux-x86_64/elastic-agent"
+    dest: "/usr/bin/elastic-agent"
+    state: link
+
+- name: Ensure Elastic Agent configuration directory exists
+  file:
+    path: /etc/elastic-agent
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Ensure /var/log/elastic-agent directory exists
+  file:
+    path: /var/log/elastic-agent
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Debug Fleet Server URL and Enrollment Token
+  debug:
+    msg: "Fleet Server URL: {{ fleet_server_url }}, Enrollment Token: {{ fleet_enrollment_token }}"
+
+- name: Enroll Elastic Agent with Fleet Server
+  shell: >
+    /opt/elastic-agent-{{ elastic_agent_version }}-linux-x86_64/elastic-agent enroll
+    --url={{ fleet_server_url }}
+    --enrollment-token={{ fleet_enrollment_token }}
+  when: elastic_agent_new_install
+
+- name: Check if Elastic Agent service file exists
+  stat:
+    path: /etc/systemd/system/elastic-agent.service
+  register: elastic_agent_service_file
+
+- name: Create Elastic Agent service file
+  copy:
+    content: |
+      [Unit]
+      Description=Elastic Agent
+      Documentation=https://www.elastic.co/guide/en/elastic-agent/current/index.html
+
+      [Service]
+      ExecStart=/opt/elastic-agent-{{ elastic_agent_version }}-linux-x86_64/elastic-agent run
+      Restart=always
+      User=root
+      Group=root
+
+      [Install]
+      WantedBy=multi-user.target
+  when: not elastic_agent_service_file.stat.exists
+
+- name: Reload systemd to recognize the new service
+  systemd:
+    daemon_reload: yes
+  when: not elastic_agent_service_file.stat.exists
+
+- name: Start and enable Elastic Agent service
+  systemd:
+    name: elastic-agent
+    state: started
+    enabled: yes
+
+- name: Wait for Elastic Agent to start and enroll
+  pause:
+    minutes: 1
+  when: elastic_agent_new_install
+
+- name: Display Elastic Agent enrollment status (final)
+  shell: /opt/elastic-agent-{{ elastic_agent_version }}-linux-x86_64/elastic-agent status
+  register: elastic_agent_final_status
+  retries: 5
+  delay: 30
+  until: elastic_agent_final_status.rc == 0 and
+         "'(HEALTHY)' in elastic_agent_final_status.stdout"
+  when: elastic_agent_new_install
+
+- name: Display final Elastic Agent status
+  debug:
+    msg: "{{ elastic_agent_final_status.stdout }}"
+  when: elastic_agent_final_status is defined and
+        "'(HEALTHY)' in elastic_agent_final_status.stdout"

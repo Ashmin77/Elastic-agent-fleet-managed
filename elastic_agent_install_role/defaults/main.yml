@@ -1,0 +1,12 @@
+---
+# Elastic Agent Configuration
+elastic_agent_version: 8.11.4
+elastic_agent_install_dir: /opt/Elastic/Agent
+elastic_agent_download_url: "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-{{ elastic_agent_version }}-linux-x86_64.tar.gz"
+
+# Fleet Server Configuration
+fleet_server_url: "http://fleet-server:8220"
+fleet_enrollment_token: "your-enrollment-token"
+
+# set elastic_agent_url
+elastic_agent_url: "{{ elastic_agent_download_url }}"
