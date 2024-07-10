@@ -1,116 +1,91 @@
-# Elastic Agent Ansible Role
+# Elastic-Agent-Fleet
+This repository contains the necessary Ansible roles and playbooks for managing Elastic Agents within a fleet-managed setup. It is designed to streamline the deployment and management of Elastic Agents across various hosts.
 
-This repository contains Ansible roles for managing Elastic Agent installations in standalone mode. The roles provided are:
+## Project Structure
 
-1. **Elastic Agent Standalone Role**: Installs and configures Elastic Agent as a standalone agent.
-2. **Elastic Agent Uninstall Role**: Uninstalls the Elastic Agent and cleans up any related configurations.
-
-## Directory Structure
+The project structure is as follows:
 
 ```
-Elastic-agent
+Elastic-agent-fleet-managed
 ├── deploy.yml
-├── elastic_agent_standalone
-│   ├── README.md
-│   ├── defaults
-│   │   └── main.yml
-│   ├── files
-│   ├── handlers
-│   │   └── main.yml
-│   ├── meta
-│   │   └── main.yml
-│   ├── tasks
-│   │   ├── install.yml
-│   │   ├── main.yml
-│   │   └── status.yml
-│   ├── templates
-│   │   └── elastic-agent.yml.j2
-│   ├── tests
-│   │   ├── inventory
-│   │   └── test.yml
-│   └── vars
-│       └── main.yml
+├── elastic_agent_install_role
+│ ├── README.md
+│ ├── defaults
+│ │ └── main.yml
+│ ├── meta
+│ │ └── main.yml
+│ ├── tasks
+│ │ ├── install.yml
+│ │ ├── main.yml
+│ │ └── status.yml
+│ └── tests
+│ ├── inventory
+│ └── test.yml
 ├── elastic_agent_uninstall_role
-│   ├── README.md
-│   ├── defaults
-│   │   └── main.yml
-│   ├── files
-│   ├── handlers
-│   │   └── main.yml
-│   ├── meta
-│   │   └── main.yml
-│   ├── tasks
-│   │   └── main.yml
-│   ├── templates
-│   ├── tests
-│   │   ├── inventory
-│   │   └── test.yml
-│   └── vars
-│       └── main.yml
+│ ├── README.md
+│ ├── defaults
+│ │ └── main.yml
+│ ├── meta
+│ │ └── main.yml
+│ ├── tasks
+│ │ └── main.yml
+│ └── tests
+│ ├── inventory
+│ └── test.yml
 ├── inventory.ini
-└── uninstall_agent.yml
+├── uninstall_agent.yml
+├── LICENSE
+└── README.md
 ```
 
-## Roles
+## Installation
 
-1. Elastic Agent Standalone Role
+To install the roles, ensure you have Ansible installed. Then, include the roles in your playbook.
 
-Installs and configures Elastic Agent on Ubuntu and RedHat servers in standalone mode.
+## Usage
 
-Path: elastic_agent_standalone
+### Install Elastic Agent
 
-Tasks:
-- Install dependencies
-- Check for existing installation
-- Download and extract Elastic Agent
-- Configure Elastic Agent
-- Start and enable Elastic Agent service
-- Check and display service status
+To install the Elastic Agent, use the following playbook:
 
-2. Elastic Agent Uninstall Role
+```yaml
+- name: Install Elastic Agent
+  hosts: all
+  roles:
+    - role: elastic_agent_install_role
+      elastic_agent_version: "<version>"
+      fleet_server_url: "http://fleet-server:8220"
+      fleet_enrollment_token: "your-enrollment-token"
+      elastic_agent_install_path: "/opt/Elastic/Agent"
+```
 
-Uninstalls Elastic Agent from Ubuntu and RedHat servers and cleans up any configurations.
+To trigger the installation playbook, run the following command:
 
-Path: elastic_agent_uninstall_role
-
-Tasks:
-- Stop and disable Elastic Agent service
-- Remove installation directory
-- Remove symlink
-- Remove configuration and log directories
-
-## Playbooks
-
-Deploy Playbook
-
-Installs Elastic Agent.
-
-Path: deploy.yml
-
-Usage: `ansible-playbook -i inventory.ini deploy.yml`
-
-Uninstall Playbook
-
-Uninstalls Elastic Agent.
-
-Path: uninstall_agent.yml
-
-Usage: `ansible-playbook -i inventory.ini uninstall_agent.yml`
-
-## Inventory
-
-Define your target hosts in the inventory.ini file.
-
-Usage:
-
-To install Elastic Agent, run:
-
-```bash
+```
 ansible-playbook -i inventory.ini deploy.yml
 ```
 
-To uninstall Elastic Agent, run:
+### Uninstall Elastic Agent
 
-```bash
+To uninstall the Elastic Agent, use the following playbook:
+
+```yaml
+- name: Uninstall Elastic Agent
+  hosts: all
+  roles:
+    - role: elastic_agent_uninstall_role
+```
+
+To trigger the uninstallation playbook, run the following command:
+
+```
 ansible-playbook -i inventory.ini uninstall_agent.yml
 ```
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+## Author Information
+
+This project was created by Ash.
